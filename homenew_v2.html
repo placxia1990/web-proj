@@ -1,0 +1,1356 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="ISO-8859-1">
+	<title>Alert Dashboard</title>
+	<link rel="stylesheet" type="text/css" href="/alertgui/resources/css/DashBoard.css">
+	<style type="text/css">
+		.detailData{
+			display:none;
+			position:relative;
+			max-width: 100%;
+			min-width: 100%;
+			min-height: 100%;
+			max-height: 100%;
+			background-color: #66c2ff;
+			overflow: auto;
+			}
+	</style>
+	<script src="/alertgui/resources/DashBoard.js" ></script>
+	<script src="/alertgui/resources/RTS_DashBoard.js" ></script>
+	
+	<!--<script src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.0/jquery.min.js"></script> -->
+	<script src="/alertgui/resources/jquery.min.js"></script>
+	<!--<script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script> -->
+	<script type="text/javascript" src="/alertgui/resources/loader.js"></script>
+	 <script type="text/javascript">
+      	google.charts.load('current', {'packages':['corechart']});
+      	//google.charts.setOnLoadCallback(drawChart);
+     </script>
+	
+	<script src="sockjs-0.3.4.js"></script>
+	<script src="stomp.js"></script>	
+	<script type="text/javascript">
+		
+		//var loggedinUser=localStorage.getItem("uname");
+		var loggedinUser=sessionStorage.getItem('uname');
+		var loggedinUserID=sessionStorage.getItem('userID');
+		
+		//alert("loggedinUser====>>"+loggedinUser);
+		//alert("loggedinUserID====>>"+loggedinUserID);
+		var uri="";
+		
+		try {
+			uri = window.location.search.substr(1);			
+			//alert("uri=="+window.location.search.substr(1));
+		} catch (e) {
+			// TODO: handle exception
+			//alert(e);
+		}	
+		
+		function clearSession(){
+			sessionStorage.removeItem("uname");			
+	        sessionStorage.removeItem("userID");	
+		}
+		
+		if(loggedinUser==""||loggedinUser==null){
+			loggedinUser=uri.split("=")[1];			
+			loggedinUser=loggedinUser.replace("_", " ");
+			//alert("User NAME ======>>>"+loggedinUser);
+		}
+			
+		//sessionStorage.clear();
+		function validate(){
+			if(loggedinUserID==null){
+				//window.location="http://localhost:8080/alertgui/loginNew.jsp";
+				window.location="http://172.16.4.88:18080/alertgui/loginNew.jsp"; //PP
+				//window.location="http://ec2-52-3-127-82.compute-1.amazonaws.com:8080/alertgui/loginNew.jsp"; //LIVE
+			}else{
+				//alert("Set user !!"+loggedinUser+"----------"+loggedinUserID+"------");
+				document.getElementById("userName").innerHTML=loggedinUser;
+				document.getElementById("userDropDown").value=loggedinUserID.trim();
+			}
+		}
+		
+		function clearDashBoard(){
+			 //document.getElementById("levelData").style.display = "none";
+			 document.getElementById("level1").style.display = "none";
+			 document.getElementById("level2").style.display = "none";
+			 document.getElementById("level3").style.display = "none";
+			 document.getElementById("level4").style.display = "none";
+			 document.getElementById("detailData").style.display = "none";
+			}
+		
+		var stompClient = null;
+        var stopsellVal="";
+       	var availVal="";
+       	var cutoffVal="";
+       	var mlosVal="";
+       	var rateVal="";
+       	var closeoutVal="";
+       	var ctaVal="";
+       	var ctdVal="";
+       	
+       	var userId="";        	
+       	var loginId="";       	
+       	var otherParam="";
+       	
+       	var stopsellC="";
+       	var availC="";
+       	var cutoffC="";
+       	var mlosC="";
+       	var rateC="";
+       	var closeoutC="";
+       	var ctaC="";
+       	var ctdC="";
+	   	
+       	var resValue1="";
+		var resValue2="";
+		var resValue3="";
+		
+       	var otherParamLive="";
+       	
+	   	function pageLoad(loggedId){
+	   		document.getElementById("userDropDown").value=loggedId;
+	   		//document.getElementById("userSelected").innerHTML=loggedId;
+	   		loginId=loggedId;
+	   	}
+	   	
+	    function setConnected(connected){
+	    	
+	    }
+	    
+	    /*function sendName() {
+	    	//alert("TRENDS == Inside sendName");  
+	    	userId = document.getElementById("userDropDown").value;        	
+	    	stompClient.send("/livestream/alertTrendT", {}, JSON.stringify({ 'userId': userId }));	
+	    }*/
+	    
+	    
+	    function sendName() {
+        	//alert("TRENDS == Inside sendName");  
+        	userId = document.getElementById("userDropDown").value;        	
+        	stompClient.send("/livestream/alertTrendT", {}, JSON.stringify({ 'userId': userId }));
+        	stompClient.send("/livestream/resAlertTrendT", {}, JSON.stringify({ 'userId': userId }));
+        	//stompClient.send("/livestream/shopperAlertTrendT", {}, JSON.stringify({ 'userId': userId }));        	      	
+        }
+	    
+	    function connectTrend() {
+        	//var socket = new SockJS('http://localhost:8080/livestream/alertTrendT');
+        	var socket = new SockJS('http://172.16.4.88:18080/livestream/alertTrendT'); //PP Env.
+        	//var socket = new SockJS('http://ec2-52-3-127-82.compute-1.amazonaws.com:8080/livestream/alertTrendT'); //LIVE Env.
+            stompClient = Stomp.over(socket);         	
+            stompClient.connect({}, function(frame) {
+            	//alert("TRENDS ==  after stomp creation....");
+                setConnected(true);
+                console.log('Connected: ' + frame);
+                //refresh during page load
+                sendName();
+                stompClient.subscribe('/topic/alerttrendt', function(greeting){ 
+                	//alert("TRENDS == Inside topic subscribe.....");
+                    showGreeting(JSON.parse(greeting.body).content);
+                }); 
+                
+                stompClient.subscribe('/topic/resalerttrendt', function(greeting){ 
+                	//alert("TRENDS == Inside topic subscribe.....");
+                    showResAlerts(JSON.parse(greeting.body).content);
+                });
+                
+                /* stompClient.subscribe('/topic/shopperalerttrendt', function(greeting){ 
+                	//alert("TRENDS == Inside topic subscribe.....");
+                    showShopperAlerts(JSON.parse(greeting.body).content);
+                }); */
+            });
+           //alert("TRENDS == SOCKET STATE ===>> "+socket.readyState); 
+        }
+	   
+	    function disconnect() {
+	        if (stompClient != null) {
+	            stompClient.disconnect();
+	        }
+	        setConnected(false);
+	        console.log("Disconnected");
+	    }
+	    
+	    function showGreeting(message) {
+	    	console.log("#################### Alert ARI ############################"+message);
+			
+	    	var list = message.split(",");
+	    	var currentId = document.getElementById("userDropDown").value;
+	
+	    	if (list[0] == "[StopSell") {
+	    		stopsellVal = list[1].split("]")[0].trim();
+	    		var userId = list[2].split("]")[0];
+	    		var response1 = document.getElementById('response1');
+	
+	    		if (document.getElementById('counter1') == null) {
+	    			var aTag = document.createElement('a');
+	    			aTag.setAttribute('href', "javascript:void(0)");
+	    			aTag.setAttribute('id', "counter1");
+	    			aTag.setAttribute('style', "color: white;");
+	    			/*aTag.setAttribute('onclick',
+	    					"loadData('/alertgui/rest/detailParamAlertNew/StopSell/"
+	    							+ currentId + "','StopSell')");*/
+	    			aTag.setAttribute('onclick',
+	    					"loadData('/alertgui/rest/detailParamAlertNew/StopSell/"
+	    							+ currentId + "','StopSell')");
+	    							
+					/* aTag.setAttribute('onclick',
+	    					"loadData('/alertgui/rest/detailParamAlertNew/StopSell/"
+	    							+ currentId + "','StopSell');createLinks(\"loadData('/alertgui/rest/detailParamAlertNew/StopSell/"
+	    							+ currentId + "','StopSell')\",'StopSell','1')"); */
+	    			response1.appendChild(aTag);
+	    			if (userId.trim() === currentId.trim()) {
+	
+	    				document.getElementById("stopsell").value = list[1].split("]")[0];
+	    				document.getElementById("counter1").textContent = stopsellVal;
+	    				stopsellC = userId.trim() + "|" + stopsellVal;
+	    			}
+	    		} else {
+	    			document.getElementById('counter1').setAttribute(
+	    					'onclick',
+	    					"loadData('/alertgui/rest/detailParamAlertNew/StopSell/"
+	    							+ currentId + "','StopSell')");
+	    			
+	    			/* document.getElementById('counter1').setAttribute(
+	    					'onclick',
+	    					"loadData('/alertgui/rest/detailParamAlertNew/StopSell/"
+	    							+ currentId + "','StopSell');createLinks(\"loadData('/alertgui/rest/detailParamAlertNew/StopSell/"
+	    							+ currentId + "','StopSell')\",'StopSell','1')"); */
+	
+	    			if (userId.trim() === currentId.trim()) {
+	
+	    				document.getElementById("stopsell").value = list[1].split("]")[0];
+	    				document.getElementById("counter1").textContent = stopsellVal;
+	    				stopsellC = userId.trim() + "|" + stopsellVal;
+	    			}
+	    		}
+	
+	    	}
+	
+	    	if (list[0] == "[Rate") {
+	    		rateVal = list[1].split("]")[0].trim();
+	    		var userId = list[2].split("]")[0];
+	    		var response5 = document.getElementById('response5');
+	
+	    		if (document.getElementById('counter5') == null) {
+	
+	    			var aTag = document.createElement('a');
+	    			aTag.setAttribute('href', "javascript:void(0)");
+	    			aTag.setAttribute('id', "counter5");
+	    			aTag.setAttribute('style', "color: white;");
+	    			aTag.setAttribute('onclick',
+	    					"loadData('/alertgui/rest/detailParamAlertNew/Rate/"
+	    							+ currentId.trim() + "','Rate')");
+					/* aTag.setAttribute('onclick',
+	    					"loadData('/alertgui/rest/detailParamAlertNew/Rate/"
+	    							+ currentId.trim()+ "','Rate');createLinks(\"loadData('/alertgui/rest/detailParamAlertNew/Rate/"
+	    							+ currentId.trim()+ "','Rate')\",'Rate','1')"); */
+	    			
+	    			
+	    			response5.appendChild(aTag);
+	
+	    			if (userId.trim() === currentId.trim()) {
+	    				document.getElementById("rate").value = list[1].split("]")[0];
+	    				document.getElementById("counter5").textContent = rateVal;
+	    				rateC = userId.trim() + "|" + rateVal;
+	    			}
+	    		} else {
+	    			document.getElementById('counter5').setAttribute(
+	    					'onclick',
+	    					"loadData('/alertgui/rest/detailParamAlertNew/Rate/"
+	    							+ currentId.trim() + "','Rate')");
+	    			
+					/* document.getElementById('counter5').setAttribute(
+	    					'onclick',
+	    					"loadData('/alertgui/rest/detailParamAlertNew/Rate/"
+	    							+ currentId.trim() + "','Rate');createLinks(\"loadData('/alertgui/rest/detailParamAlertNew/Rate/"
+	    							+ currentId.trim() + "','Rate')\",'Rate','1')"); */	    			
+	    			
+	    			if (userId.trim() === currentId.trim()) {
+	    				document.getElementById("rate").value = list[1].split("]")[0];
+	    				document.getElementById("counter5").textContent = rateVal;
+	    				rateC = userId.trim() + "|" + rateVal;
+	    			}
+	    		}
+	    	}
+	
+	    	if (list[0] == "[Avail") {
+	    		var userId = list[2].split("]")[0];
+	    		if (userId.trim() === currentId.trim()) {
+	    			availVal = list[1].split("]")[0].trim();
+	    			document.getElementById("avail").value = list[1].split("]")[0];
+	    			availC = userId.trim() + "|" + availVal;
+	    		}
+	    	}
+	
+	    	if (list[0] == "[CutOff") {
+	    		var userId = list[2].split("]")[0];
+	    		if (userId.trim() === currentId.trim()) {
+	    			cutoffVal = list[1].split("]")[0].trim();
+	    			document.getElementById("cutoff").value = list[1].split("]")[0];
+	    			cutoffC = userId.trim() + "|" + cutoffVal;
+	    		}
+	    	}
+	
+	    	if (list[0] == "[MLOS") {
+	    		var userId = list[2].split("]")[0];
+	    		if (userId.trim() === currentId.trim()) {
+	    			mlosVal = list[1].split("]")[0].trim();
+	    			document.getElementById("mlos").value = list[1].split("]")[0];
+	    			mlosC = userId.trim() + "|" + mlosVal;
+	    		}
+	    	}
+	    	
+	    	if(list[0]=="[CTA"){        			
+        			var userId = list[2].split("]")[0];
+        			if(userId.trim()===currentId.trim()){
+        				ctaVal = list[1].split("]")[0].trim();
+        				document.getElementById("cta").value = list[1].split("]")[0];
+        				ctaC=userId.trim()+"|"+ctaVal;
+        			}
+       		}
+       		
+       		if(list[0]=="[CTD"){        			
+       			var userId = list[2].split("]")[0];
+       			if(userId.trim()===currentId.trim()){
+       				ctdVal = list[1].split("]")[0].trim();
+       				document.getElementById("ctd").value = list[1].split("]")[0];
+       				ctdC=userId.trim()+"|"+ctdVal;
+       			}
+       		}
+       		
+       		if(list[0]=="[CloseOut"){        			
+       			var userId = list[2].split("]")[0];
+       			if(userId.trim()===currentId.trim()){
+       				closeoutVal = list[1].split("]")[0].trim();
+       				document.getElementById("closeout").value = list[1].split("]")[0];
+       				closeoutC=userId.trim()+"|"+closeoutVal;
+       			}
+       		}
+	
+	    	if(list[0]=="[Avail" || list[0]=="[CutOff" || list[0]=="[MLOS" || list[0]=="[CTA" || list[0]=="[CTD" || list[0]=="[CloseOut"){
+	    		otherParam = Number(availVal)+Number(cutoffVal)+Number(mlosVal)+Number(ctaVal)+Number(ctdVal)+Number(closeoutVal);
+				otherParamLive= Number(cutoffVal)+Number(mlosVal)+Number(ctaVal)+Number(ctdVal)+Number(closeoutVal);
+
+	    		var userId = list[2].split("]")[0];
+	    		var responseOther = document.getElementById('responseOther');
+	
+	    		if (document.getElementById('counterOther') == null) {
+	
+	    			var aTag = document.createElement('a');
+		   			aTag.setAttribute('href', "javascript:void(0)");
+		   			aTag.setAttribute('id', "counterOther");
+		   			aTag.setAttribute('style', "color: white;");
+		   			aTag.setAttribute('onclick',"loadData('/alertgui/rest/detailParamAlertOtherNew/Other/"
+		   							+ availVal.trim() + "/" + cutoffVal.trim() + "/"
+		   							+ mlosVal.trim() + "/" + currentId.trim()
+		   							+ "','Other')");
+		   				
+		   			
+					/* aTag.setAttribute('onclick',"loadData('/alertgui/rest/detailParamAlertOtherNew/Other/"+availVal.trim()+"/"+cutoffVal.trim()+"/"+mlosVal.trim()+"/"+ctaVal.trim()+"/"+ctdVal.trim()+"/"+closeoutVal.trim()+"/"+currentId.trim()+"','Other');createLinks(\"loadData('/alertgui/rest/detailParamAlertOtherNew/Other/"
+							+ availVal.trim() + "/" + cutoffVal.trim() + "/"
+							+ mlosVal.trim()+"/"+ctaVal.trim()+"/"+ctdVal.trim()+"/"+closeoutVal.trim()+ "/" + currentId.trim()
+							+ "','Other')\",\"Other\",\"1\")"); */
+		   							
+		    			responseOther.appendChild(aTag);
+	    			if (userId.trim() === currentId.trim()) {
+	    				document.getElementById("other").value = Number(availVal) + Number(cutoffVal) + Number(mlosVal);
+	    				document.getElementById("counterOther").textContent = otherParam;
+	    			}
+	    		} else {
+	    			 document.getElementById('counterOther').setAttribute(
+	    					'onclick',
+	    					"loadData('/alertgui/rest/detailParamAlertOtherNew/Other/"
+	    							+ availVal.trim() + "/" + cutoffVal.trim() + "/"
+	    							+ mlosVal.trim() +"/"+ctaVal.trim()+"/"+ctdVal.trim()+"/"+closeoutVal.trim()+"/"+currentId.trim()
+	    							+ "','Other')"); 
+	    							
+	    			/* document.getElementById('counterOther').setAttribute(
+	    					'onclick',
+	    					"loadData('/alertgui/rest/detailParamAlertOtherNew/Other/"
+	    							+ availVal.trim() + "/" + cutoffVal.trim() + "/"
+	    							+ mlosVal.trim()+"/"+ctaVal.trim()+"/"+ctdVal.trim()+"/"+closeoutVal.trim()+"/"+currentId.trim()
+	    							+ "','Other');createLinks(\"loadData('/alertgui/rest/detailParamAlertOtherNew/Other/"
+	    							+ availVal.trim() + "/" + cutoffVal.trim() + "/"
+	    							+ mlosVal.trim()+"/"+ctaVal.trim()+"/"+ctdVal.trim()+"/"+closeoutVal.trim()+"/"+currentId.trim()
+	    							+ "','Other')\",\"Other\",\"1\")");  */
+	 
+	    			if (userId.trim() === currentId.trim()) {
+	    				document.getElementById("other").value = Number(availVal)
+	    						+ Number(cutoffVal) + Number(mlosVal);
+	    				document.getElementById("counterOther").textContent = otherParam;
+	    			}
+	    		}
+	    	}
+	
+	    }
+	    
+	    function viewChart(stopsellC,availC,cutoffC,mlosC,rateC,ctaC,ctdC,closeoutC){
+			   console.log("StopSell====="+stopsellC+"Avail====="+availC+"CutOff====="+cutoffC+"Rate====="+rateC+"MLOS====="+mlosC+"CloseOut====="+closeoutC+"CTA====="+ctaC+"CTD====="+ctdC);
+			   stopsellC=stopsellC.split("|");
+			   availC=availC.split("|");
+			   cutoffC=cutoffC.split("|");
+			   rateC=rateC.split("|");
+			   mlosC=mlosC.split("|");
+			   closeoutC=closeoutC.split("|");
+			   ctaC=ctaC.split("|");
+			   ctdC=ctdC.split("|");
+			   var currentId = document.getElementById("userDropDown").value;
+			   
+			   if(currentId.trim() == stopsellC[0].trim() && currentId.trim() == availC[0].trim() && currentId.trim() == cutoffC[0].trim() && currentId.trim() ==rateC[0].trim()  && currentId.trim() == mlosC[0].trim() && currentId.trim() == ctaC[0].trim() && currentId.trim() == ctdC[0].trim() && currentId.trim() == closeoutC[0].trim()){
+				   var data = google.visualization.arrayToDataTable([
+                        			      ['Param', 'Count'],
+                        			      ['StopSell',     parseInt(stopsellC[1].trim())],
+                        			      ['Avail',      parseInt(availC[1].trim())],
+                        			      ['CutOff',  parseInt(cutoffC[1].trim())],
+                        			      ['Rate', parseInt(rateC[1].trim())],
+                        			      ['MLOS',    parseInt(mlosC[1].trim())],
+                        			      ['CTA',    parseInt(ctaC[1].trim())],
+                        			      ['CTD',    parseInt(ctdC[1].trim())],
+                        			      ['CloseOut',    parseInt(closeoutC[1].trim())]
+                        			    ]);
+                                 			
+       			    var options = {
+       			      	title: 'Statistics',
+       			      	is3D: true,
+       			      	sliceVisibilityThreshold:.0001,
+			  			height: 230,
+			  			//colors: ['#ccebff', '#007acc', '#1a8cff', '#33adff', '#008ae6'],
+			  			//backgroundColor:'transparent',
+			  			backgroundColor:'#80ccff',
+			  			titleTextStyle: { color: '#FFFFFF',fontSize: 12},
+			  			pieSliceTextStyle:{color: '#FFFFFF',fontSize: 12},
+			  			fontName:'Verdana',
+			  			pieSliceBorderColor:'#ffffff',
+			  			chartArea:{left:'20%',top:20,width:'100%',height:'90%'}  										
+       			    };
+       			    var chart = new google.visualization.PieChart(document.getElementById('piechart'));
+       			    chart.draw(data, options);
+			   }
+			   
+		}
+
+//----------------------------------------------------------
+        
+        var randNum="";
+    	var timeClock="";
+	    function startTimeLiveChart() {
+		    //alert("startTimeLiveChart called");
+	    	var today = new Date();
+		    var h = today.getHours();
+		    var m = today.getMinutes();
+		    var s = today.getSeconds();
+		    var mili = today.getMilliseconds();
+		    m = checkTime(m);
+		    s = checkTime(s);
+		    //document.getElementById('clock').innerHTML =  h + ":" + m;
+		    var t = setTimeout(startTimeLiveChart, 2000);
+		    timeClock=h + ":" + m + ":" + s;
+		    console.log("Live Chart Clock "+timeClock);		
+		    createArray(timeClock);
+			createArrayResv(timeClock);
+		    
+		}
+		
+		function checkTime(i) {
+		    if (i < 10) {i = "0" + i};  // add zero in front of numbers < 10
+		    return i;
+		}
+				
+       
+       	var mainArr = [["Time","StopSell","Avail","Rate","Other"]];
+		function createArray(time) {
+			var childArr = new Array();
+			childArr[0] = time;
+			childArr[1] = parseInt(stopsellVal.trim());
+			childArr[2] = parseInt(availVal.trim());
+			childArr[3] = parseInt(rateVal.trim());
+			childArr[4] = parseInt(otherParamLive);
+						
+		    //console.log("XXXXXStopSell====="+stopsellVal+"Avail====="+availVal+"CutOff====="+mlosVal+"Rate====="+rateC+"MLOS====="+mlosC+"CloseOut====="+closeoutC+"CTA====="+ctaC+"CTD====="+ctdC);
+		
+			mainArr.push(childArr);
+			if(mainArr.length>16){
+				mainArr[1]=["Time","StopSell","Avail","Rate","Other"];
+				mainArr.shift();
+				
+			} 
+			
+		}    
+    
+		google.charts.setOnLoadCallback(drawChartLive);
+				
+		function drawChartLive() {
+			var data = google.visualization.arrayToDataTable(mainArr);
+
+			
+			var options = {
+				title : 'ARI Failures Trend',
+				curveType : 'none',
+				legend : {
+					position : 'right'
+				},
+				height: 370,
+				pointSize: 1,
+				hAxis : { 
+			        textStyle : {
+			            fontSize: 10 // or the number you want
+			        },
+			        
+			        slantedText:true,
+			        slantedTextAngle:40
+			    },
+			    vAxis : { 
+			        textStyle : {
+			            fontSize: 10 // or the number you want
+			        },
+			        gridlines: { 
+			        	count: 8,
+			        }
+
+			    }
+				
+			};
+
+			var chart = new google.visualization.LineChart(document
+					.getElementById('curve_chartARI'));
+
+			chart.draw(data, options);
+		}
+		
+		google.charts.setOnLoadCallback(drawChartLiveResv);
+		setInterval("drawChartLiveResv()", 2000);
+		setInterval("drawChartLive()", 2000);
+        
+        
+        //-----------------------------------------------------------------
+ 
+	 	setInterval("sendName()",2000);
+	 	setInterval(function callChart(){
+			    viewChart(stopsellC,availC,cutoffC,mlosC,rateC,ctaC,ctdC,closeoutC);
+			    //viewResChart(resValue1,resValue2,resValue3);
+			    viewResChart();
+			    viewRTSChart();
+		},2000);
+ 
+	
+		
+		
+		var listSize="";
+		function loadData(detailDataUrl,param){
+			console.log("detailDataUrl=========>>>>"+detailDataUrl);
+			var currentId = document.getElementById("userDropDown").value;
+			var dataList = [""];
+			var formatted="";
+			var header="";
+			var url="";
+			var tempParam="";
+			
+			if(param=="Avail" || param=="CutOff" || param=="MLOS" || param=="CTA" || param=="CTD"|| param=="CloseOut"){
+				createLinks("loadData('"+detailDataUrl+"','"+param+"')",param,"2");
+			}
+			else{
+				createLinks("loadData('"+detailDataUrl+"','"+param+"')",param,"1");
+			}
+			
+			var xhttp = new XMLHttpRequest();
+		  	xhttp.onreadystatechange=function() {
+			    if (xhttp.readyState == 4) {
+			      	res = xhttp.responseText;
+			       	res=res.replace("[","");
+			      	res=res.replace("]","");
+				  	var dataSet = res.split(",");
+				  	listSize=dataSet.length;
+				  	for (var i = 0; i < dataSet.length; i++) {	
+							var paramData=dataSet[i].split("=");
+							tempParam=paramData[0].trim();
+							if(paramData[1].trim()!="0"){
+
+								if(currentId == "admin" || currentId == "UdaiS" || currentId == "TechSupport"){
+									flag="a";
+									if(param =="Other"){
+										header="Param : Other || Type : Channel";
+										url="/alertgui/rest/detailParamAlertNew/"+paramData[0].trim()+"/"+currentId;
+										if(paramData[1].trim()=="0"){
+											url="";	
+										}
+										
+										formatted=formatted+"<div class='Row' id='"+paramData[0].trim()+"-row'><div class='Cell'><p id='"+paramData[0]+"-head'>"+paramData[0]+"</p></div><div class='Cell'><p class='count' id='"+paramData[0]+"-cnt'><a href='javascript:void(0)' onclick=\"loadDataLevel1('"+url+"','"+param+"','"+paramData[0].trim()+"','"+flag+"')\">"+paramData[1]+"</a></p></div></div>";
+	
+									}else{
+										header="Param : "+param +" || Type : Channel";
+										if(paramData[0].trim()=="Others"){
+											url="/alertgui/rest/propertyChannelCountOthersNew/"+param+"/"+currentId+"/"+paramData[0].trim()+"/"+flag;
+											if(paramData[1].trim()=="0"){
+												url="";
+											}
+										}
+										else{
+											url="/alertgui/rest/propertyChannelCountNew/"+param+"/"+currentId+"/"+paramData[0].trim()+"/"+flag;
+											if(paramData[1].trim()=="0"){
+												url="";
+											}
+										}										
+										if(paramData[0].trim()=="Others"){
+											formatted=formatted+"<div class='Row' id='"+paramData[0].trim()+"-row'><div class='Cell'><p id='"+paramData[0]+"-head'>"+paramData[0]+"</p></div><div class='Cell'><p class='count' id='"+paramData[0]+"-cnt' onclick=\"loadDataLevel1('"+url+"','"+param+"','"+paramData[0].trim()+"','"+flag+"');showSubRow('Row','"+paramData[0].trim()+"-row','"+paramData[0].trim()+"-rowData','RowData','"+listSize+"')\"><a href='javascript:void(0)' >"+paramData[1]+"</a><div onclick=\"loadDataLevel1('"+url+"','"+param+"','"+paramData[0].trim()+"','"+flag+"');showSubRow('Row','"+paramData[0].trim()+"-row','"+paramData[0].trim()+"-rowData','RowData','"+listSize+"')\" class='colexp' id='"+paramData[0].trim()+"-rowData-colexp'>+</div></p></div></div>";
+										}
+										else{											
+											formatted=formatted+"<div class='Row' id='"+paramData[0].trim()+"-row'><div class='Cell'><p id='"+paramData[0]+"-head'>"+paramData[0]+"</p></div><div class='Cell'><p class='count' id='"+paramData[0]+"-cnt' onclick=\"loadDataLevel1('"+url+"','"+param+"','"+paramData[0].trim()+"','"+flag+"');showSubRow('Row','"+paramData[0].trim()+"-row','"+paramData[0].trim()+"-rowData','RowData','"+listSize+"')\"><a href='javascript:void(0)' >"+paramData[1]+"</a></p></div></div>";
+										}
+	
+									}
+								
+								}							
+								else{
+									flag="c";
+									if(param =="Other"){
+										header="Param : Other || Type : Property";
+										url="/alertgui/rest/detailParamAlertNew/"+paramData[0].trim()+"/"+currentId;
+										if(paramData[1].trim()=="0"){
+											url="";
+										}
+										formatted=formatted+"<div class='Row' id='"+paramData[0].trim()+"-row'><div class='Cell'><p id='"+paramData[0]+"-head'>"+paramData[0]+"</p></div><div class='Cell'><p class='count' id='"+paramData[0]+"-cnt'><a href='javascript:void(0)' onclick=\"loadDataLevel1('"+url+"','"+param+"','"+paramData[0].trim()+"','"+flag+"')\">"+paramData[1]+"</a></p></div></div>";
+									}else{
+										
+										header="Param : "+param +" || Type : Property";
+										if(paramData[0].trim()=="Others"){
+											url="/alertgui/rest/propertyChannelCountOthersNew/"+param+"/"+currentId+"/"+paramData[0].trim()+"/"+flag;
+											if(paramData[1].trim()=="0"){
+												url="";
+											}
+										}
+										else{
+											url="/alertgui/rest/propertyChannelCountNew/"+param+"/"+currentId+"/"+paramData[0].trim()+"/"+flag;
+											if(paramData[1].trim()=="0"){
+												url="";
+											}
+										}										
+										if(paramData[0].trim()=="Others"){
+											formatted=formatted+"<div class='Row' id='"+paramData[0].trim()+"-row'><div class='Cell'><p id='"+paramData[0]+"-head'>"+paramData[0]+"</p></div><div class='Cell'><p class='count' id='"+paramData[0]+"-cnt' onclick=\"loadDataLevel1('"+url+"','"+param+"','"+paramData[0].trim()+"','"+flag+"');showSubRow('Row','"+paramData[0].trim()+"-row','"+paramData[0].trim()+"-rowData','RowData','"+listSize+"')\"><a href='javascript:void(0)' >"+paramData[1]+"</a><div onclick=\"loadDataLevel1('"+url+"','"+param+"','"+paramData[0].trim()+"','"+flag+"');showSubRow('Row','"+paramData[0].trim()+"-row','"+paramData[0].trim()+"-rowData','RowData','"+listSize+"')\" class='colexp' id='"+paramData[0].trim()+"-rowData-colexp'>+</div></p></div></div>";
+										}
+										else{
+											formatted=formatted+"<div class='Row' id='"+paramData[0].trim()+"-row'><div class='Cell'><p id='"+paramData[0]+"-head'>"+paramData[0]+"</p></div><div class='Cell'><p class='count' id='"+paramData[0]+"-cnt' onclick=\"loadDataLevel1('"+url+"','"+param+"','"+paramData[0].trim()+"','"+flag+"');showSubRow('Row','"+paramData[0].trim()+"-row','"+paramData[0].trim()+"-rowData','RowData','"+listSize+"')\"><a href='javascript:void(0)' >"+paramData[1]+"</a></p></div></div>";
+										}
+									}							
+								}
+								if(tempParam=="Others"){
+									formatted=formatted+"<div onclick='hideSubRow(\"RowData\")' class='RowData' id='"+paramData[0].trim()+"-rowData'></div>";
+								}					
+							
+						}
+				  	}
+			
+					hideLoading();
+					if((param.trim()!="StopSell") && (param.trim()!="Rate") && (param.trim()!="Other") && (param.trim()!="Others")){
+					//if((param.trim()=="Avail") || (param.trim()=="CutOff") || (param.trim()=="MLOS") || (param.trim()=="CTA") || (param.trim()=="CTD")|| (param.trim()=="CloseOut") ||(param.trim()!="Others")){
+
+						var dynamicHTML="<div class='Table'><div class='Heading'><div class='Cell'><p>"+header+"</p></div><div class='Cell'><p>Counts</p></div></div>";
+				  	
+					  	dynamicHTML=dynamicHTML+formatted;
+					  	dynamicHTML=dynamicHTML+"</div>";
+						//hideLoading();
+					  	document.getElementById("level2").innerHTML=dynamicHTML;
+					  	document.getElementById("level2").style.display="block";
+					  	
+					  	document.getElementById("levelData").style.visibility="visible";
+					  	document.getElementById("level1").style.visibility="visible";
+					  	document.getElementById("level2").style.visibility="visible";
+						document.getElementById("level2").style.visibility="visible";
+						
+						genAnimation("level2");
+					  	
+					  	document.getElementById("detailData").style.display="none";
+					  	document.getElementById("level3").style.display="none";
+						document.getElementById("level4").style.display="none";
+						
+					}
+					//else if(param.trim()=="Others"){
+					else if((param.trim()!="StopSell") && (param.trim()!="Rate") && (param.trim()!="Other") && (param.trim() == "Others")){
+							var dynamicHTML="<div  class='Table' id='"+param.trim()+"-sub'>"+formatted+"</div>";
+					  		//hideLoadingWhite();
+					  		document.getElementById(param.trim()+"-rowData").innerHTML=dynamicHTML;	
+					}
+					else{
+						var dynamicHTML="<div class='Table'><div class='Heading'><div class='Cell'><p>"+header+"</p></div><div class='Cell'><p>Counts</p></div></div>";
+				  	
+					  	dynamicHTML=dynamicHTML+formatted;
+					  	dynamicHTML=dynamicHTML+"</div>";
+						//hideLoading();
+					  	
+						document.getElementById("level1").innerHTML=dynamicHTML;
+					  	document.getElementById("levelData").style.display="block";
+					  	document.getElementById("level1").style.display="block";
+					  	
+					  	document.getElementById("levelData").style.visibility="visible";
+					  	document.getElementById("level1").style.visibility="visible";
+						
+					  	document.getElementById("animatedLineChartARI").style.display="none";
+					  	document.getElementById("animatedLineChartResv").style.display="none";
+					  	//document.getElementById("animatedLineChartARI").style.zIndex="-1";
+					  	//document.getElementById("animatedLineChartResv").style.zIndex="-1";;
+					  	
+						genAnimation("level1");
+
+					  	document.getElementById("detailData").style.display="none";
+					  	document.getElementById("level2").style.display="none";
+						document.getElementById("level3").style.display="none";
+						document.getElementById("level4").style.display="none";
+												
+					}
+					
+					
+				 }
+		    };
+			
+			
+			if(detailDataUrl==""){
+				hideLoading();
+			}else{
+				showLoading();
+			}
+			xhttp.open("GET", detailDataUrl, true);
+			xhttp.send();
+			
+		}
+		
+		function loadDataLevel1(detailDataUrl,superParam,param,flag){
+		  		
+		  	var formatted="";
+			var header="";
+		  	var currentId = document.getElementById("userDropDown").value;
+			//alert("================"+param+"===");
+			if(param=="Avail" || param=="CutOff" || param=="MLOS" || param=="CTA" || param=="CTD"|| param=="CloseOut"){
+				loadData(detailDataUrl,param);
+		  	}
+		  	else{
+		  	
+		  		if(superParam=="Avail" || superParam=="CutOff" || superParam=="MLOS" || superParam=="CTA" || superParam=="CTD"|| superParam=="CloseOut"){
+					createLinks("loadDataLevel1('"+detailDataUrl+"','"+superParam+"','"+param+"','"+flag+"')",param,"3");
+				}else{
+					createLinks("loadDataLevel1('"+detailDataUrl+"','"+superParam+"','"+param+"','"+flag+"')",param,"2");
+				}
+
+		  		//alert("================"+param+"===yyyyyyyy");
+				var xhttp = new XMLHttpRequest();
+			  	xhttp.onreadystatechange=function() {
+				    if (xhttp.readyState == 4) {
+				      	res = xhttp.responseText;
+				       	res=res.replace("[","");
+				      	res=res.replace("]","");
+				      		      	
+					  	var dataSet = res.split(",");
+					  	listSize=dataSet.length;
+					  	for (var i = 0; i < dataSet.length; i++) {
+							var paramData=dataSet[i].split("=");
+							var url="";
+							
+							if(paramData[1].trim()!="0"){
+
+							
+								if(flag == "c"){
+									//alert("check ===============1");
+									
+									url="/alertgui/rest/detailParamChannelToPropertyNew/"+superParam+"/"+currentId+"/"+paramData[0];
+									if(paramData[1].trim()=="0"){
+										url="";
+									}
+									formatted=formatted+"<div class='RowLvl1' id='"+paramData[0].trim()+"-RowLvl1'><div class='Cell'><p>"+paramData[0]+"</p></div><div class='Cell'><p class='count'><a href='javascript:void(0)' onclick='loadDetailData(\""+url+"\",\""+param+"\",\""+paramData[0].trim()+"\")'>"+paramData[1]+"</a></p></div></div>";
+									//formatted=formatted+"<div onclick='hideSubRow(\"RowDataChanProp\")' class='RowDataChanProp' id='"+paramData[0].trim()+"-ChanProp'></div>";
+								}else{
+									//alert("check ===============2");
+									if(param.trim()!="Others"){
+										var url="/alertgui/rest/detailParamChannelToPropertyNew/"+superParam.trim()+"/"+currentId.trim()+"/"+paramData[0].trim();								
+										header="Param : "+superParam+" || Channel : "+param;
+										if(paramData[1].trim()=="0"){
+											url="";
+										}
+										formatted=formatted+"<div class='RowLvl1' id='"+paramData[0].trim()+"-RowLvl1'><div class='Cell'><p>"+paramData[0]+"</p></div><div class='Cell'><p class='count'><a href='javascript:void(0)' onclick='loadDetailData(\""+url+"\",\""+param+"\",\""+paramData[0].trim()+"\")'>"+paramData[1]+"</a></p></div></div>";
+									}
+									else{
+										var url="/alertgui/rest/propertyChannelCountNew/"+superParam+"/"+currentId+"/"+paramData[0]+"/"+flag;
+										header="Param : "+superParam+" || Channel : "+param;
+										if(paramData[1].trim()=="0"){
+											url="";
+										}										
+										else{
+											formatted=formatted+"<div class='RowLvl1' id='"+paramData[0].trim()+"-RowLvl1'><div class='Cell'><p>"+paramData[0]+"</p></div><div class='Cell'><p class='count'><a href='javascript:void(0)' onclick='loadDataChannelProperty(\""+url+"\",\""+superParam+"\",\""+paramData[0].trim()+"\");showSubRow(\"RowLvl1\",\""+paramData[0].trim()+"-RowLvl1\",\""+paramData[0].trim()+"-ChanProp\",\"RowDataChanProp\",\""+listSize+"\")'>"+paramData[1]+"</a></p></div></div>";
+											formatted=formatted+"<div onclick='hideSubRow(\"RowDataChanProp\")' class='RowDataChanProp' id='"+paramData[0].trim()+"-ChanProp'></div>";
+										}
+										
+									}
+								}
+							}
+					  	}
+					  	
+						hideLoading();
+				  		//if(param=="Others" ){
+				  		if((param.trim()=="Others") && (superParam.trim() !="Avail" && superParam.trim() !="CutOff" && superParam.trim() !="MLOS" && superParam.trim() !="CTA" && superParam.trim() !="CTD" && superParam.trim() !="CloseOut")){	
+							//alert("====if============"+superParam+"-----"+param+"xxxxxxx");
+							var dynamicHTML="<div  class='Table' id='"+param.trim()+"-sub'>"+formatted+"</div>";
+					  		//hideLoadingWhite();
+					  		document.getElementById(param.trim()+"-rowData").innerHTML=dynamicHTML;			
+					  		document.getElementById("level1").style.visibility="visible";
+					  		genAnimation("level1");
+					  		
+							document.getElementById("level2").style.display="none";
+							document.getElementById("level3").style.display="none";
+							document.getElementById("level4").style.display="none";
+							document.getElementById("detailData").style.display="none";
+						}
+				  		else if((param.trim()=="Others") && (superParam.trim() =="Avail" || superParam.trim() =="CutOff" || superParam.trim() =="MLOS" || superParam.trim() !="CTA" || superParam.trim() !="CTD" || superParam.trim() !="CloseOut")){	
+							//alert("=====else if==========="+param+"xxxxxxx");
+							var dynamicHTML="<div  class='Table' id='"+param.trim()+"-sub'>"+formatted+"</div>";
+					  		//hideLoadingWhite();
+					  		document.getElementById(param.trim()+"-rowData").innerHTML=dynamicHTML;			
+					  		
+							document.getElementById("level2").style.display="block";
+							
+							document.getElementById("level1").style.visibility="visible";
+							document.getElementById("level2").style.visibility="visible";
+							genAnimation("level2");
+							
+							document.getElementById("level3").style.display="none";
+							document.getElementById("level4").style.display="none";
+							document.getElementById("detailData").style.display="none";
+						}  
+						else if((flag=="a" || flag=="c") && (superParam.trim()=="StopSell" || superParam.trim()=="Rate" || superParam.trim()=="Other")){
+							//alert("====else if============"+param+"xxxxxxx");
+							var dynamicHTML="<div class='Table'><div class='Heading'><div class='Cell'><p>"+header+"</p></div><div class='Cell'><p>Counts</p></div></div>";
+				  			
+				  			dynamicHTML=dynamicHTML+formatted;
+				  			dynamicHTML=dynamicHTML+"</div>";
+							document.getElementById("level2").innerHTML=dynamicHTML;
+							document.getElementById("level2").style.display="block";
+							
+							document.getElementById("level1").style.visibility="visible";
+							document.getElementById("level2").style.visibility="visible";
+							genAnimation("level2");
+							
+							document.getElementById("level3").style.visibility="none";
+							document.getElementById("level4").style.display="none";
+							document.getElementById("detailData").style.display="none";
+						}
+						else if((flag=="a" || flag=="c") && (superParam.trim()=="Avail" || superParam.trim()=="CutOff" || superParam.trim()=="MLOS" || superParam.trim() !="CTA" || superParam.trim() !="CTD" || superParam.trim() !="CloseOut")){
+							//alert("====else if============"+param+"xxxxxxx");
+							var dynamicHTML="<div class='Table'><div class='Heading'><div class='Cell'><p>"+header+"</p></div><div class='Cell'><p>Counts</p></div></div>";
+				  			
+				  			dynamicHTML=dynamicHTML+formatted;
+				  			dynamicHTML=dynamicHTML+"</div>";
+							document.getElementById("level3").innerHTML=dynamicHTML;
+							document.getElementById("level3").style.display="block";
+							
+							document.getElementById("level1").style.visibility="visible";
+							document.getElementById("level2").style.visibility="visible";
+							document.getElementById("level3").style.visibility="visible";
+							
+							genAnimation("level3");
+							
+							document.getElementById("level4").style.display="none";
+							document.getElementById("detailData").style.display="none";
+						}
+						
+						else{
+							//alert("====else ============"+param+"xxxxxxx");
+							var dynamicHTML="<div class='Table'><div class='Heading'><div class='Cell'><p>"+header+"</p></div><div class='Cell'><p>Counts</p></div></div>";
+				  			dynamicHTML=dynamicHTML+formatted;
+				  			dynamicHTML=dynamicHTML+"</div>";
+							document.getElementById("level2").innerHTML=dynamicHTML;
+							document.getElementById("level2").style.display="block";
+							
+							document.getElementById("level1").style.visibility="visible";
+							document.getElementById("level2").style.visibility="visible";
+							
+							genAnimation("level2");
+							
+							document.getElementById("level3").style.display="none";
+							document.getElementById("level4").style.display="none";
+							document.getElementById("detailData").style.display="none";
+						}
+										  		
+				  		//hideLoading();	
+					 }
+			    };
+				
+				if(detailDataUrl==""){
+					hideLoading();
+				}else{
+					showLoading();
+				}
+				xhttp.open("GET", detailDataUrl, true);
+				xhttp.send();
+				
+		  	}
+			
+			
+		}
+		
+		function loadDataChannelProperty(detailDataUrl,superParam,param){
+		  	//alert("detailDataUrl======"+detailDataUrl+"superParam======"+superParam+"param======"+param);
+			//createLinks("loadDataChannelProperty('"+detailDataUrl+"','"+superParam+"','"+param+"')",param,"3");
+			var currentId = document.getElementById("userDropDown").value;			
+		  	var formatted="";
+			var header="";
+		
+			if(superParam=="Avail" || superParam=="CutOff" || superParam=="MLOS" || superParam=="CTA" || superParam=="CTD"|| superParam=="CloseOut"){
+				createLinks("loadDataChannelProperty('"+detailDataUrl+"','"+superParam+"','"+param+"')",param,"4");
+			}else{
+				createLinks("loadDataChannelProperty('"+detailDataUrl+"','"+superParam+"','"+param+"')",param,"3");
+
+			}
+			
+			var xhttp = new XMLHttpRequest();
+		  	xhttp.onreadystatechange=function() {
+			    if (xhttp.readyState == 4) {
+			      	res = xhttp.responseText;
+			       	res=res.replace("[","");
+			      	res=res.replace("]","");
+				  	var dataSet = res.split(",");
+				  	for (var i = 0; i < dataSet.length; i++) {
+						var paramData=dataSet[i].split("=");
+						var url="/alertgui/rest/detailParamChannelToPropertyNew/"+superParam.trim()+"/"+currentId.trim()+"/"+paramData[0].trim();
+						if(paramData[1].trim()=="0"){
+							url="";
+						}
+						formatted=formatted+"<div class='RowLvl2'><div class='Cell'><p>"+paramData[0]+"</p></div><div class='Cell'><p><a href='javascript:void(0)' onclick='loadDetailData(\""+url+"\",\""+superParam+"\",\""+paramData[0].trim()+"\")'>"+paramData[1]+"</a></p></div></div>";
+				  	}
+				  	//var dynamicHTML="<div  class='Table' id='"+param.trim()+"-subChanProp'>"+formatted+"</div>";
+				  	//hideLoadingWhite();
+				  	//document.getElementById(param+"-ChanProp").innerHTML=dynamicHTML;
+				  	if(currentId.trim()=="admin" || currentId.trim()=="UdaiS"){
+				  		header="Param : "+superParam+" || Channel : "+param;
+				  	}else{
+				  		header="Param : "+superParam+" || Property : "+param;
+				  	}
+				  	
+				  	
+					if(superParam=="Avail" || superParam=="CutOff" || superParam=="MLOS" || superParam=="CTA" || superParam=="CTD"|| superParam=="CloseOut"){
+						var dynamicHTML="<div class='Table'><div class='Heading'><div class='Cell'><p>"+header+"</p></div><div class='Cell'><p>Counts</p></div></div>";
+				  	
+			  			dynamicHTML=dynamicHTML+formatted;
+			  			dynamicHTML=dynamicHTML+"</div>";
+						document.getElementById("level3").innerHTML=dynamicHTML;
+						document.getElementById("level3").style.display="block";
+						
+						document.getElementById("level1").style.visibility="visible";
+						document.getElementById("level2").style.visibility="visible";
+						document.getElementById("level3").style.visibility="visible";
+						genAnimation("level3");
+						
+						document.getElementById("level4").style.display="none";
+						document.getElementById("detailData").style.display="none";
+					}
+					else{
+						var dynamicHTML="<div class='Table'><div class='Heading'><div class='Cell'><p>"+header+"</p></div><div class='Cell'><p>Counts</p></div></div>";
+				  	
+						dynamicHTML=dynamicHTML+formatted;
+			  			dynamicHTML=dynamicHTML+"</div>";
+						document.getElementById("level2").innerHTML=dynamicHTML;
+						document.getElementById("level2").style.display="block";
+						
+						genAnimation("level2");
+						
+						document.getElementById("level1").style.visibility="visible";
+						document.getElementById("level2").style.visibility="visible";
+						//genAnimation(param.trim());						
+						document.getElementById("level3").style.display="none";
+						document.getElementById("level4").style.display="none";
+						document.getElementById("detailData").style.display="none";
+					}
+					hideLoading();
+				 }
+		    };
+			
+			if(detailDataUrl==""){
+				hideLoading();
+			}else{
+				showLoading();
+			}
+			xhttp.open("GET", detailDataUrl, true);
+			xhttp.send();
+		  	
+		}
+		
+		var prevCnt=0;
+		var counter=0;
+		var globalArrary=[];
+		
+		function loadDetailData(detailDataUrl,superParam,param){
+		  	//alert("detailDataUrl====>>>>"+detailDataUrl+"===="+superParam+"===="+param);
+			if(superParam=="Avail" || superParam=="CutOff" || superParam=="MLOS" || superParam=="CTA" || superParam=="CTD"|| superParam=="CloseOut"){
+				createLinks("loadDetailData('"+detailDataUrl+"','"+superParam+"','"+param+"')",param,"5");
+			}else{
+				createLinks("loadDetailData('"+detailDataUrl+"','"+superParam+"','"+param+"')",param,"4");
+			}
+			
+		  	var formatted="";
+			var channel="";
+			var property="";
+			var xhttp = new XMLHttpRequest();
+		  	xhttp.onreadystatechange=function() {
+			    if (xhttp.readyState == 4) {
+			      	res = xhttp.responseText;
+					//alert(res);
+			       	res=res.replace("[","");
+			      	res=res.replace("]","");
+			      	//console.log("------------------------"+res);
+				  	var dataSet = res.split(",");
+				  	//globalArrary=dataSet;
+					//var dataSet=[res];
+					//alert(dataSet.length);
+				  	//for (var i = 0; i < dataSet.length; i++) {
+				  	for (var i = counter; i < dataSet.length; i++) {
+						//var paramData=dataSet[i].split("^");
+						//formatted=formatted+"<div id='detailRow' class='Row'><div class='Cell' style='width:30%;'><p>"+paramData[0]+"</p></div><div class='Cell' style='width:15%;'><p>"+paramData[1]+"</p></div><div class='Cell' style='width:35%;'><p>"+paramData[2]+"</p></div><div class='Cell' style='width:10%;'><p>"+paramData[3]+"</p></div><div class='Cell' style='width:10%;'><p>"+paramData[4]+"</p></div></div>";
+						var paramData=dataSet[i].split("^");
+						if(channel =="" && property==""){
+							channel=paramData[1];
+							property=paramData[0];
+						}
+										
+						var url="/alertgui/rest/detailLogView/"+property+"/"+channel+"/"+paramData[3]+"/"+paramData[5];
+						//alert(url);
+						formatted=formatted+"<div id='detailRow' class='Row'><div class='Cell' style='width:30%;'><p>"+paramData[2]+"</p></div><div class='Cell' style='width:10%;'><p>"+paramData[3]+"</p></div><div class='Cell' style='width:10%;'><p>"+paramData[4]+"</p></div><div class='Cell' style='width:20%;'><p><a class='detailRowLink' href='"+url+"' onclick=\"window.open('"+url+"','width=300','height=600','scrollbars=yes'); return false;\">"+paramData[5]+"</a></p></div><div class='Cell' style='width:30%;'><p>"+paramData[6]+"</p></div></div>";
+					}
+				  	var dataTable="<div class='DataTable'>"+formatted+"</div>";
+				  		
+				  	var headTable="<div class='TitleTable'><div class='Heading' id='detailData'>";
+				  	headTable=headTable+"<div class='HCell' style='width:100%;'><p id='breadcrumb'>Param : "+superParam+" || Property : "+property+" || Channel : "+channel+"</p></div>";
+				  	headTable=headTable+"</div></div>";
+				  	
+				  	headTable=headTable+"<div class='HeadTable'><div class='Heading' id='detailData'>";
+				  	headTable=headTable+"<div class='HCell' style='width:30%;'><p>Room Type</p></div><div class='HCell' style='width:10%;'><p>For Date</p></div><div class='HCell' style='width:10%;'><p>Request Value</p></div><div class='HCell' style='width:20%;'><p>Request Date</p></div><div class='HCell' style='width:30%;'><p>Error Message</p></div>";
+				  	headTable=headTable+"</div></div>";
+
+
+					var dynamicHTML=headTable+dataTable;
+					//hideSmall();
+					document.getElementById("detailData").innerHTML=dynamicHTML;
+					
+					document.getElementById("levelData").style.visibility="hidden";
+					document.getElementById("level1").style.visibility="hidden";
+					document.getElementById("level2").style.visibility="hidden";
+					document.getElementById("level3").style.visibility="hidden";
+					document.getElementById("level4").style.visibility="hidden";
+					
+					document.getElementById("detailData").style.display="block";
+					
+					hideLoading();
+				 }
+		    };
+			
+			if(detailDataUrl==""){
+				hideLoading();
+			}else{
+				showLoading();
+			}
+			xhttp.open("GET", detailDataUrl, true);
+			
+			xhttp.send();
+		}
+		  	
+		
+		
+		
+		function showDetails(id){
+			document.getElementById(id).style.display="block";
+			showLoading("block");
+		}
+		function hideSmall(){
+			document.getElementById("level1").style.visibility="hidden";
+			document.getElementById("level2").style.visibility="hidden";
+			document.getElementById("level3").style.visibility="hidden";
+			document.getElementById("level4").style.visibility="hidden";
+		}
+			
+
+		function showSubRow(superclass,superID,id,className,listSize){
+			//document.getElementById(superID).style.background="#1ac6ff";
+			var superElms = document.getElementsByClassName(superclass);
+			//alert(superElms.length);
+			var elems = document.getElementsByClassName(className);
+			
+			for (var i=0;i<elems.length;i+=1){
+			   if(elems[i].id != id){
+				   elems[i].style.display = 'none';
+					try{
+						document.getElementById(elems[i].id+"-colexp").innerHTML="+";
+					}catch(err){}
+				   superElms[i].style.background="#33adff";
+			   }else{
+				   	document.getElementById(id).style.display="block";
+				   	try{
+						document.getElementById(id+"-colexp").innerHTML="-";
+				   	}catch(err){
+				   		
+				   	}
+					document.getElementById(superID).style.background="#3399ff";
+			   }
+			  
+			}
+			
+		}		
+		
+		function closeDetails(id){
+			document.getElementById(id).style.visibility="hidden";
+			document.getElementById(id).style.zIndex ="-1";
+			
+			document.getElementById("levelData").style.visibility="visible";
+			document.getElementById("level1").style.visibility="visible";
+			document.getElementById("level2").style.visibility="visible";
+			document.getElementById("level3").style.visibility="visible";
+			document.getElementById("level4").style.visibility="visible";
+			
+		}
+
+		function menuBarOn(){
+			document.getElementById("menuBar").style.visibility="visible";
+		}
+		
+		
+    </script>
+   
+	
+</head>
+<body onload="showLoading();validate();startTime();startTimeLiveChart();connectTrend();setTimeout(hideLoading, 5000);">
+	<input type="hidden" name="name" id="name">
+	<input type="hidden" name="stopsell" id="stopsell">
+	<input type="hidden" name="avail" id="avail">
+	<input type="hidden" name="cutoff" id="cutoff">
+	<input type="hidden" name="mlos" id="mlos">
+	<input type="hidden" name="rate" id="rate">
+	<input type="hidden" name="cta" id="cta">
+	<input type="hidden" name="ctd" id="ctd">
+	<input type="hidden" name="closeout" id="closeout">
+	<input type="hidden" name="other" id="other">
+	<input type="hidden" name="userId" value="${sessionScope.userId}" />	
+	<input type="hidden" name="ce" id="ce">
+	<input type="hidden" name="nf" id="nf">
+	<input type="hidden" name="exception" id="exception">	
+	
+	<div class="toolbar">
+		<div class="dropdown">
+			<a href=""><div class="menuIcon"></div></a>
+			<div id="menuBar">
+				<ul>
+				  <li class="menugroup">Configuration</li>
+				  
+				  <li><a href="http://64.77.63.36:9393/RTAdminDashboard/ConfigDetailAction" target="_blank">New RT Admin</a></li>
+				  <li><a href="http://64.77.63.56/admin/login_inter_res.jsp" target="_blank">Old RT Admin</a></li>
+				  <li><a href="https://rtcontrolcenter.ratetiger.com/RTControlCenter/#loginInfo" target="_blank">RT Control Center</a></li>
+				  <li><a href="https://64.77.63.36:444/RTAnalyzer/pages/rtaadminlogin.jsp" target="_blank">RTAnalyzer</a></li>
+				  
+				  <li class="menugroup">Logs</li>
+				  <li><a href="/alertgui/resources/homeNew.jsp">WebL Logger</a></li>
+				  <li><a href="http://64.77.63.7:81/ARISupport/" target="_blank">ARI Delta Support</a></li>
+				  <li><a href="http://64.77.63.27/RTCSetup/ReservationLog.do" target="_blank">Reservation Log Report</a></li>
+   				  <li><a href="http://64.77.63.27/RTConnectLog/Login.do" target="_blank">Non Delta RTConnect Log</a></li>
+   				  <li><a href="http://64.77.63.20:9707/RTRscheduler/login" target="_blank">RTRscheduler</a></li>
+   				  
+   				  <li class="menugroup">Issue Trackers</li>
+   				  <li><a href="http://crm.ratetiger.com/eRevMax/Login.aspx" target="_blank">Biz CRM</a></li>
+				  <li><a href="https://erevmax.atlassian.net/login" target="_blank">JIRA</a></li>
+				  <li><a href="http://172.16.1.74/login_page.php" target="_blank">Mantis</a></li>
+				  <li><a href="https://3.basecamp.com/sign_in" target="_blank">Basecamp</a></li>
+				  
+				  <li class="menugroup">Products</li>			  
+				  <li><a href="https://live.ratetiger.com/#/login" target="_blank">Live OS</a></li>
+				  <li><a href="http://rtreview.ratetiger.com/RTReview/flex/RTReview.jsp" target="_blank">RT Review</a></li>
+				  <li><a href="https://www.simpledistribution.com/index.jsp" target="_blank">Simple Distribution</a></li>
+				  
+				</ul>
+			</div>
+		</div>
+				
+		<div id="tagline"> 
+             <div class="logout" id="userName"></div> 
+			 <div class="logout" id="pipe">|</div>
+			 <div class="logout" id="lgout"><a href="/alertgui/loginController/logoutNew" class="logoutbtn" onclick="clearSession()">Logout</a></div>
+        </div>
+	</div>
+	<div class="menu">
+		<div id="users">
+			<select class="dropDownList" id="userDropDown" name="userDropDown" onchange="showLoading();sendName();changeUser();setTimeout(hideLoading, 2000);">
+				<option value="UdaiS">Udai Singh Solanki</option>
+				<option value="AlokS">Alok Sharan</option>
+				<option value="AnkitaJ">Ankita Jain</option>
+				<option value="VictorA">Victor Anderson</option>
+				<option value="MadhavP">Madhav Purang</option>
+				<option value="PiyaliG">Piyali Ghosh</option>
+				<option value="PoojaJ">Pooja Joshi</option>
+				<option value="RadhaB">Radha A Biswas</option>
+				<option value="ReshmaK">Reshma Kumar</option>
+				<option value="SergioP">Sergio Panzera</option>
+				<option value="SoumyaB">Soumya Basu</option>
+				<option value="SuchandraA">Suchandra Acharya</option>
+				<option value="VirendraT">Virendra Thakur</option>
+				<option value="admin">Admin</option>
+			</select>
+		</div>
+		<div id="clockArea">
+			<div id="clockLBL">Time :</div>
+			<div id="clock"></div>
+		</div>
+		<div class="breadcrumbMain" id="breadcrumbMain">
+			
+		</div>
+	</div>
+	
+	<div class="container">
+		<div class="sideBar" id="sideBar">
+			<div class="alertBoard" id="ari">
+				<div class="head">ARI Failures</div>
+				<div class="body">
+					<div class="Table">
+					    <div class="Heading">
+					        <div class="Cell">
+					            <p>Parameters</p>
+					        </div>
+					        <div class="Cell">
+					            <p>Counts</p>
+					        </div>
+					    </div>
+					    <div class="Row">
+					        <div class="Cell">
+					            <p>Stop Sell</p>
+					        </div>
+					        <div class="Cell">
+					            <p class="click" id="response1" onclick=""></p>
+					        </div>
+					    </div>
+					    <div class="Row">
+					        <div class="Cell">
+					            <p>Rate</p>
+					        </div>
+					        <div class="Cell">
+					            <p class="click" id="response5" onclick=""></p>
+					        </div>				        
+					    </div>
+					    <div class="Row">
+					        <div class="Cell">
+					            <p>Other</p>
+					        </div>
+					        <div class="Cell">
+					       		<p class="click" id="responseOther" onclick=""></p>
+					        </div>
+					    </div>
+					</div>
+					<div id="piechart"></div>
+				</div>
+			</div>
+		
+			<div class="alertBoard" id="resv">
+				<div class="head">Reservation Failures</div>
+				<div id="resvBody" class="body"> <!--resvBody-->		
+					<div class="Table">
+						<div class="Heading">
+					        <div class="Cell">
+					            <p id="resvHeading"></p>
+					        </div>
+					        <div class="Cell">
+					            <p>Counts</p>
+					        </div>					        
+						</div>
+					    <div class="Row">
+					        <div class="Cell">
+					            <p id="resvResponse1"></p>
+					        </div>
+					        <div class="Cell">
+					            <p id="resvResponse1Count"></p>
+					        </div>					        
+					    </div>
+					    <div class="Row">
+					        <div class="Cell">
+					            <p id="resvResponse2"></p>
+					        </div>
+					        <div class="Cell">
+					            <p id="resvResponse2Count"></p>
+					        </div>				        
+					    </div>
+					    <div class="Row">
+					        <div class="Cell">
+					            <p id="resvResponseOther">Other</p>
+					        </div>
+					        <div class="Cell">
+					       		<p id="resvResponseOtherCount"></p>
+					        </div>					        
+					    </div>					
+					</div>			
+				</div>									
+				<div id="resv_piechart"></div>	
+			</div>
+		
+			<div class="alertBoard" id="rts">
+				<div class="head">Shopper Failures</div>
+				<div id="rtsBody" class="body"> <!--resvBody-->		
+					<div class="Table">
+						<div class="Heading">
+					        <div class="Cell">
+					            <p id="Heading">Categories</p>
+					        </div>
+					        <div class="Cell">
+					            <p>Counts</p>
+					        </div>					        
+						</div>
+					    <div class="Row">
+					        <div class="Cell">
+					            <p id="rtsResponse1">CE</p>
+					        </div>
+					        <div class="Cell">
+					            <p id="rtsResponse1Count"></p>
+					        </div>					        
+					    </div>
+					    <div class="Row">
+					        <div class="Cell">
+					            <p id="rtsResponse2">NF</p>
+					        </div>
+					        <div class="Cell">
+					            <p id="rtsResponse2Count"></p>
+					        </div>				        
+					    </div>
+					    <div class="Row">
+					        <div class="Cell">
+					            <p id="rtsResponse3">Exceptions</p>
+					        </div>
+					        <div class="Cell">
+					       		<p id="rtsResponse3Count"></p>
+					        </div>					        
+					    </div>					
+					</div>			
+				</div>									
+				<div id="rts_piechart"></div>
+			</div>			
+		</div>
+		<div class="main" id="main-window">
+			<div class="detail" id="datailInfo">
+				<div id="loadingWindow" class="loadingWindow">
+					<div id="loading" class='loading'></div>
+					<div id="loadingMSG" class='loadingMSG'>Instantiating...</div>
+				</div>
+				<div id ='detailData' class='detailData'></div>
+				<div id ='levelData' class ='levelData'>
+					<div class="animatedLineChart" id="animatedLineChartARI">
+						<div id="curve_chartARI"></div>
+					</div>
+					<div class="animatedLineChart" id="animatedLineChartResv">
+						<div id="curve_chartResv"></div>
+					</div>
+					
+					<div class="level" id="level1">
+					</div>
+					<div class="level" id="level2">
+					</div>
+					<div class="level" id="level3">
+					</div>
+					<div class="level" id="level4">
+					</div>
+				</div>
+				
+			</div>
+		</div>
+	</div>
+
+
+
+</body>
+</html>
